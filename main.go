@@ -33,7 +33,7 @@ func main() {
 		fmt.Printf("error in whoami: %s\n", err)
 		os.Exit(1)
 	}
-	accountID := strconv.Itoa(whoami.Data.User.ID)
+	accountID := strconv.Itoa(whoami.Data.Account.ID)
 
 	opts := &dnsimple.ZoneRecordListOptions{Name: recordname, Type: "TXT"}
 	records, err := client.Zones.ListRecords(accountID, zonename, opts)
