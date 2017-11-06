@@ -10,8 +10,8 @@ import (
 )
 
 func main() {
-	token := os.Getenv("DNSIMPLE_TOKEN")
-	if len(os.Args) < 3 || len(os.Args) > 4 || token == "" {
+	token1 := os.Getenv("DNSIMPLE_TOKEN")
+	if len(os.Args) < 3 || len(os.Args) > 4 || token1 == "" {
 		fmt.Printf("Usage: dnslink-dnsimple DOMAIN PATH [RECORD||=_dnslink]\n")
 		fmt.Printf("Example: dnslink-dnsimple example.com /ipfs/QmFoo\n")
 		fmt.Printf("\n")
@@ -26,40 +26,47 @@ func main() {
 		recordname = os.Args[3]
 	}
 
-	client := dnsimple.NewClient(dnsimple.NewOauthTokenCredentials(token))
+	client := dnsimple.NewClient(dnsimple.NewOauthTokenCredentials(token1))
 
-	whoami, err := client.Identity.Whoami()
+	// Loop over all accounts to find the one containing the relevant zone.
+	accopts := &dnsimple.ListOptions{}
+	accounts, err := client.Accounts.ListAccounts(accopts)
 	if err != nil {
-		fmt.Printf("error in whoami: %s\n", err)
+		fmt.Printf("error in listAccounts: %s\n", err)
 		os.Exit(1)
 	}
-	accountID := strconv.Itoa(whoami.Data.Account.ID)
-
-	opts := &dnsimple.ZoneRecordListOptions{Name: recordname, Type: "TXT"}
-	records, err := client.Zones.ListRecords(accountID, zonename, opts)
-	if err != nil {
-		fmt.Printf("error in listRecords: %s\n", err)
-		os.Exit(1)
+	var account string
+	var records []dnsimple.ZoneRecord
+	for _, a := range accounts.Data {
+		acc := strconv.Itoa(a.ID)
+		zropts := &dnsimple.ZoneRecordListOptions{Name: recordname, Type: "TXT"}
+		recs, err := client.Zones.ListRecords(acc, zonename, zropts)
+		if err != nil {
+			continue
+		}
+		account = acc
+		records = recs.Data
 	}
 
+	// Create or update the _dnslink record.
 	var updatedRecord *dnsimple.ZoneRecord
-	if len(records.Data) == 0 {
+	if len(records) == 0 {
 		record := &dnsimple.ZoneRecord{
 			Type:    "TXT",
 			Name:    recordname,
 			Content: "dnslink=" + path,
 			TTL:     120,
 		}
-		response, err := client.Zones.CreateRecord(accountID, zonename, *record)
+		response, err := client.Zones.CreateRecord(account, zonename, *record)
 		if err != nil {
 			fmt.Printf("error in createRecord: %s\n", err)
 			os.Exit(1)
 		}
 		updatedRecord = response.Data
 	} else {
-		record := records.Data[0]
+		record := records[0]
 		record.Content = "dnslink=" + path
-		response, err := client.Zones.UpdateRecord(accountID, zonename, record.ID, record)
+		response, err := client.Zones.UpdateRecord(account, zonename, record.ID, record)
 		if err != nil {
 			fmt.Printf("error in updateRecord: %s\n", err)
 			os.Exit(1)
