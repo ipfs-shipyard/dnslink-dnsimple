@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	dnsimple "github.com/dnsimple/dnsimple-go/dnsimple"
@@ -43,7 +42,7 @@ func main() {
 	var account string
 	var records []dnsimple.ZoneRecord
 	for _, a := range accounts.Data {
-		acc := strconv.Itoa(a.ID)
+		acc := string(a.ID)
 		zropts := &dnsimple.ZoneRecordListOptions{Name: recordname, Type: "TXT"}
 		recs, err := client.Zones.ListRecords(acc, zonename, zropts)
 		if err != nil {
