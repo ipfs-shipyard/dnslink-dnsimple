@@ -21,3 +21,15 @@ OPTIONS
 EXAMPLES
     dnslink-dnsimple -t $(cat dnsimple-token) -d domain.net -r _dnslink -l /ipns/ipfs.io
 ```
+
+## Install
+
+```
+go get github.com/ipfs/dnslink-dnsimple
+```
+
+## LICENSE
+
+```
+MIT
+```
