@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	dnsimple "github.com/dnsimple/dnsimple-go/dnsimple"
+	"golang.org/x/oauth2"
 )
 
 func printError(token string, err string) {
@@ -30,7 +33,9 @@ func main() {
 		recordname = os.Args[3]
 	}
 
-	client := dnsimple.NewClient(dnsimple.NewOauthTokenCredentials(token))
+	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
+	tc := oauth2.NewClient(context.Background(), ts)
+	client := dnsimple.NewClient(tc)
 
 	// Loop over all accounts to find the one containing the relevant zone.
 	accopts := &dnsimple.ListOptions{}
@@ -42,7 +47,10 @@ func main() {
 	var account string
 	var records []dnsimple.ZoneRecord
 	for _, a := range accounts.Data {
-		acc := string(a.ID)
+		acc := strconv.Itoa(int(a.ID))
+		if err != nil {
+			panic(err)
+		}
 		zropts := &dnsimple.ZoneRecordListOptions{Name: recordname, Type: "TXT"}
 		recs, err := client.Zones.ListRecords(acc, zonename, zropts)
 		if err != nil {
