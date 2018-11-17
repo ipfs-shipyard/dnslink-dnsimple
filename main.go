@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"errors"
@@ -10,6 +11,7 @@ import (
 	logging "log"
 
 	dns "github.com/dnsimple/dnsimple-go/dnsimple"
+	oauth "golang.org/x/oauth2"
 )
 
 var log *logging.Logger
@@ -31,25 +33,22 @@ const (
 
 var Usage = `
 USAGE
-		dnslink-dnsimple -t <api-token> -d <domain-name> [-r <record-name>] -l <dnslink-value>
+		DNSIMPLE_TOKEN=trustno1 dnslink-dnsimple -d <domain-name> -r <record-name> -l <dnslink-value>
 
 OPTIONS
-		-t, --token <string>    dnsimple api token (required)
 		-l, --link  <string>    dnslink value, eg. ipfs path (required)
 		-d, --domain <string>   dnsimple domain name (required)
-		-r, --record <string>   domain record name
+		-r, --record <string>   domain record name (required)
 		-v, --verbose           show logging output
 		-h, --help              show this documentation
 		--ttl <int>             set the ttl of the record (default: 60)
 
 EXAMPLES
-		dnslink-dnsimple -t $(cat dnsimple-token) -d domain.net -r _dnslink -l /ipns/ipfs.io
+		DNSIMPLE_TOKEN=$(cat dnsimple-token) dnslink-dnsimple -d domain.net -r _dnslink -l /ipns/ipfs.io
 `
 
 func parseArgs() (Args, error) {
 	var a Args
-	flag.StringVar(&a.Token, "t", "", "")
-	flag.StringVar(&a.Token, "token", "", "")
 	flag.StringVar(&a.Domain, "d", "", "")
 	flag.StringVar(&a.Domain, "domain", "", "")
 	flag.StringVar(&a.RecName, "r", "", "")
@@ -60,12 +59,14 @@ func parseArgs() (Args, error) {
 	flag.BoolVar(&a.Verbose, "verbose", false, "")
 	flag.IntVar(&a.TTL, "ttl", DefaultTTL, "")
 
+	a.Token = os.Getenv("DNSIMPLE_TOKEN")
+
   flag.Usage = func() {
     fmt.Fprintf(os.Stderr, Usage)
   }
 	flag.Parse()
-	if a.Token == "" || a.Domain == "" || a.Link == "" {
-		return a, errors.New("token, record, and link arguments required")
+	if a.Token == "" || a.Domain == "" || a.RecName == "" || a.Link == "" {
+		return a, errors.New("token, domain, record, and link arguments required")
 	}
 	return a, nil
 }
@@ -95,7 +96,10 @@ func sanitizeErr(token string, err error) string {
 }
 
 func errMain(args Args) error {
-	client := dns.NewClient(dns.NewOauthTokenCredentials(args.Token))
+	ts := oauth.StaticTokenSource(&oauth.Token{AccessToken: args.Token})
+	tc := oauth.NewClient(context.Background(), ts)
+
+	client := dns.NewClient(tc)
 
 	// get the account responsible for zone, and the dnslink record if there is one.
 	acc, oldR, err := findAccountAndRecord(client, args)
@@ -136,7 +140,7 @@ func findAccountAndRecord(c *dns.Client, args Args) (acc string, rec *dns.ZoneRe
 	if oldR == nil {
 		log.Println("existing dnslink record: not found")
 	} else {
-		log.Println("existing dnslink record:", oldR)
+		log.Println("existing dnslink record:", oldR.ZoneID, oldR.Type, oldR.Name, oldR.Content)
 	}
 
 	return acc, oldR, nil
@@ -149,7 +153,7 @@ func findAccountForZone(c *dns.Client, args Args) (acc string, recs []dns.ZoneRe
 	if err != nil {
 		return "", nil, err
 	}
-	log.Printf("found %d accounts for token: %s\n", len(accounts.Data), accounts.Data)
+	log.Printf("found %d accounts for token: %s\n", len(accounts.Data), accounts.Data[0].Email)
 
 	for _, a := range accounts.Data {
 		acc := fmt.Sprintf("%d", a.ID)
@@ -172,12 +176,12 @@ func findAccountForZone(c *dns.Client, args Args) (acc string, recs []dns.ZoneRe
 
 func createRecord(c *dns.Client, args Args, acc string) (newR *dns.ZoneRecord, err error) {
 	newR = newRecord(args)
-	log.Println("will CreateRecord:", newR)
+	log.Println("will CreateRecord:", newR.ZoneID, newR.Type, newR.Name, newR.Content)
 	res, err := c.Zones.CreateRecord(acc, args.Domain, *newR)
 	if err != nil {
 		return nil, fmt.Errorf("CreateRecord: %v", err)
 	}
-	log.Println("did CreateRecord:", res.Data)
+	log.Println("did CreateRecord:", res.Data.ZoneID, res.Data.Type, res.Data.Name, res.Data.Content)
 	return res.Data, nil
 }
 
@@ -193,12 +197,12 @@ func updateRecord(c *dns.Client, args Args, acc string, oldR *dns.ZoneRecord) (n
 	newR.ZoneID = oldR.ZoneID
 	newR.ParentID = oldR.ParentID
 
-	log.Println("will UpdateRecord:", newR)
+	log.Println("will UpdateRecord:", newR.ZoneID, newR.Type, newR.Name, newR.Content)
 	res, err := c.Zones.UpdateRecord(acc, args.Domain, newR.ID, *newR)
 	if err != nil {
 		return nil, fmt.Errorf("UpdateRecord: %v", err)
 	}
-	log.Println("did UpdateRecord:", res.Data)
+	log.Println("did UpdateRecord:", res.Data.ZoneID, res.Data.Type, res.Data.Name, res.Data.Content)
 	return res.Data, nil
 }
 
