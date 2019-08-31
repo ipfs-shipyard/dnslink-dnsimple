@@ -2,13 +2,13 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"os"
 	"errors"
-	"io/ioutil"
-	"strings"
 	"flag"
+	"fmt"
+	"io/ioutil"
 	logging "log"
+	"os"
+	"strings"
 
 	dns "github.com/dnsimple/dnsimple-go/dnsimple"
 	oauth "golang.org/x/oauth2"
@@ -16,7 +16,7 @@ import (
 
 var log *logging.Logger
 
-type Args struct{
+type Args struct {
 	Token   string
 	Domain  string
 	RecName string
@@ -61,9 +61,9 @@ func parseArgs() (Args, error) {
 
 	a.Token = os.Getenv("DNSIMPLE_TOKEN")
 
-  flag.Usage = func() {
-    fmt.Fprintf(os.Stderr, Usage)
-  }
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, Usage)
+	}
 	flag.Parse()
 	if a.Token == "" || a.Domain == "" || a.RecName == "" || a.Link == "" {
 		return a, errors.New("token, domain, record, and link arguments required")
@@ -74,9 +74,9 @@ func parseArgs() (Args, error) {
 func main() {
 	args, err := parseArgs()
 	if err != nil {
-    fmt.Fprintln(os.Stderr, "error:", err)
-    fmt.Fprintln(os.Stderr, Usage)
-    os.Exit(-1)
+		fmt.Fprintln(os.Stderr, "error:", err)
+		fmt.Fprintln(os.Stderr, Usage)
+		os.Exit(-1)
 	}
 
 	if args.Verbose {
@@ -85,10 +85,10 @@ func main() {
 		log = logging.New(ioutil.Discard, "", 0)
 	}
 
-  if err := errMain(args); err != nil {
-    fmt.Fprintln(os.Stderr, "error:", sanitizeErr(args.Token, err))
-    os.Exit(-1)
-  }
+	if err := errMain(args); err != nil {
+		fmt.Fprintln(os.Stderr, "error:", sanitizeErr(args.Token, err))
+		os.Exit(-1)
+	}
 }
 
 func sanitizeErr(token string, err error) string {
@@ -166,13 +166,12 @@ func findAccountForZone(c *dns.Client, args Args) (acc string, recs []dns.ZoneRe
 
 		records := recs.Data
 		log.Printf("found domain %s in account %s with %d records\n",
-				args.Domain, acc, len(records))
+			args.Domain, acc, len(records))
 		return acc, records, nil
 	}
 
 	return "", nil, fmt.Errorf("did not find account for: %s", args.Domain)
 }
-
 
 func createRecord(c *dns.Client, args Args, acc string) (newR *dns.ZoneRecord, err error) {
 	newR = newRecord(args)
