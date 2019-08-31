@@ -7,7 +7,7 @@ Update dnslink TXT records in DNSimple
 ```
 > dnslink-dnsimple -h
 USAGE
-    dnslink-dnsimple -t <api-token> -d <domain-name> [-r <record-name>] -l <dnslink-value>
+    DNSIMPLE_TOKEN=trustno1 dnslink-dnsimple -t <api-token> -d <domain-name> [-r <record-name>] -l <dnslink-value>
 
 OPTIONS
     -t, --token <string>    dnsimple api token (required)
