@@ -62,7 +62,7 @@ func parseArgs() (Args, error) {
 	a.Token = os.Getenv("DNSIMPLE_TOKEN")
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, Usage)
+		fmt.Fprint(os.Stderr, Usage)
 	}
 	flag.Parse()
 	if a.Token == "" || a.Domain == "" || a.RecName == "" || a.Link == "" {
