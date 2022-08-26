@@ -5,7 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	logging "log"
 	"os"
 	"strings"
@@ -82,7 +82,7 @@ func main() {
 	if args.Verbose {
 		log = logging.New(os.Stderr, "", 0)
 	} else {
-		log = logging.New(ioutil.Discard, "", 0)
+		log = logging.New(io.Discard, "", 0)
 	}
 
 	if err := errMain(args); err != nil {
