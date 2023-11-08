@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	dns "github.com/dnsimple/dnsimple-go/dnsimple"
-	oauth "golang.org/x/oauth2"
 )
 
 var log *logging.Logger
@@ -96,9 +95,7 @@ func sanitizeErr(token string, err error) string {
 }
 
 func errMain(args Args) error {
-	ts := oauth.StaticTokenSource(&oauth.Token{AccessToken: args.Token})
-	tc := oauth.NewClient(context.Background(), ts)
-
+	tc := dns.StaticTokenHTTPClient(context.Background(), args.Token)
 	client := dns.NewClient(tc)
 
 	// get the account responsible for zone, and the dnslink record if there is one.
@@ -133,7 +130,7 @@ func findAccountAndRecord(c *dns.Client, args Args) (acc string, rec *dns.ZoneRe
 	// find record to replace, if any
 	var oldR *dns.ZoneRecord
 	for _, r := range recs {
-		if strings.HasPrefix(r.Content, "dnslink") {
+		if strings.HasPrefix(r.Content, "dnslink") || strings.HasPrefix(r.Content, "\"dnslink") {
 			oldR = &r
 		}
 	}
@@ -149,7 +146,7 @@ func findAccountAndRecord(c *dns.Client, args Args) (acc string, rec *dns.ZoneRe
 func findAccountForZone(c *dns.Client, args Args) (acc string, recs []dns.ZoneRecord, err error) {
 	// Loop over all accounts to find the one containing the relevant zone.
 	accopts := &dns.ListOptions{}
-	accounts, err := c.Accounts.ListAccounts(accopts)
+	accounts, err := c.Accounts.ListAccounts(context.Background(), accopts)
 	if err != nil {
 		return "", nil, err
 	}
@@ -157,8 +154,8 @@ func findAccountForZone(c *dns.Client, args Args) (acc string, recs []dns.ZoneRe
 
 	for _, a := range accounts.Data {
 		acc := fmt.Sprintf("%d", a.ID)
-		zropts := &dns.ZoneRecordListOptions{Name: args.RecName, Type: TXT}
-		recs, err := c.Zones.ListRecords(acc, args.Domain, zropts)
+		zropts := &dns.ZoneRecordListOptions{Name: dns.String(args.RecName), Type: dns.String(TXT)}
+		recs, err := c.Zones.ListRecords(context.Background(), acc, args.Domain, zropts)
 		if err != nil {
 			log.Printf("error listing records of account %s: %s", acc, err)
 			continue
@@ -173,10 +170,10 @@ func findAccountForZone(c *dns.Client, args Args) (acc string, recs []dns.ZoneRe
 	return "", nil, fmt.Errorf("did not find account for: %s", args.Domain)
 }
 
-func createRecord(c *dns.Client, args Args, acc string) (newR *dns.ZoneRecord, err error) {
-	newR = newRecord(args)
-	log.Println("will CreateRecord:", newR.ZoneID, newR.Type, newR.Name, newR.Content)
-	res, err := c.Zones.CreateRecord(acc, args.Domain, *newR)
+func createRecord(c *dns.Client, args Args, acc string) (*dns.ZoneRecord, error) {
+	newR := newRecord(args)
+	log.Println("will CreateRecord:", newR.ZoneID, newR.Type, *newR.Name, newR.Content)
+	res, err := c.Zones.CreateRecord(context.Background(), acc, args.Domain, *newR)
 	if err != nil {
 		return nil, fmt.Errorf("CreateRecord: %v", err)
 	}
@@ -184,20 +181,18 @@ func createRecord(c *dns.Client, args Args, acc string) (newR *dns.ZoneRecord, e
 	return res.Data, nil
 }
 
-func updateRecord(c *dns.Client, args Args, acc string, oldR *dns.ZoneRecord) (newR *dns.ZoneRecord, err error) {
+func updateRecord(c *dns.Client, args Args, acc string, oldR *dns.ZoneRecord) (*dns.ZoneRecord, error) {
 	// just update value
 	oldR.Content = DnslinkPrefix + args.Link
 
 	// we only want to change the value.
 	// looking at the API, it should only update what we ask it to update.
 	// (i was getting "regions not available in your plan")
-	newR = newRecord(args)
-	newR.ID = oldR.ID
+	newR := newRecord(args)
 	newR.ZoneID = oldR.ZoneID
-	newR.ParentID = oldR.ParentID
 
-	log.Println("will UpdateRecord:", newR.ZoneID, newR.Type, newR.Name, newR.Content)
-	res, err := c.Zones.UpdateRecord(acc, args.Domain, newR.ID, *newR)
+	log.Println("will UpdateRecord:", newR.ZoneID, newR.Type, *newR.Name, newR.Content)
+	res, err := c.Zones.UpdateRecord(context.Background(), acc, args.Domain, oldR.ID, *newR)
 	if err != nil {
 		return nil, fmt.Errorf("UpdateRecord: %v", err)
 	}
@@ -205,10 +200,10 @@ func updateRecord(c *dns.Client, args Args, acc string, oldR *dns.ZoneRecord) (n
 	return res.Data, nil
 }
 
-func newRecord(args Args) *dns.ZoneRecord {
-	return &dns.ZoneRecord{
+func newRecord(args Args) *dns.ZoneRecordAttributes {
+	return &dns.ZoneRecordAttributes{
 		Type:    TXT,
-		Name:    args.RecName,
+		Name:    dns.String(args.RecName),
 		Content: DnslinkPrefix + args.Link,
 		TTL:     args.TTL,
 	}
