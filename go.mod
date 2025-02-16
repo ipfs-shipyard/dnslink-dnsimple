@@ -1,6 +1,6 @@
 module github.com/ipfs/dnslink-dnsimple
 
-go 1.22
+go 1.23
 
 require github.com/dnsimple/dnsimple-go v1.5.0
 
